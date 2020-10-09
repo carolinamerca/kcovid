@@ -1,0 +1,518 @@
+---
+title: "Análise dos dados da COVID-19 em Portugal"
+author: "Carolina Merca"
+date: "29/09/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(data.table)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(grid)
+library(plotly)
+library(rgdal)
+library(geojsonio)
+library(geojsonR)
+library(RColorBrewer)
+library(leaflet)
+library(sf)
+
+covid.pt <- fread("https://raw.githubusercontent.com/dssg-pt/covid19pt-data/master/data.csv")
+
+mapa_portugal <- geojson_read("https://raw.githubusercontent.com/dssg-pt/covid19pt-data/master/extra/mapas/portugal.geojson", what = "sp")
+
+covid.pt$data<-as.Date(as.character(covid.pt$data),format = "%d-%m-%Y")
+
+```
+
+
+Utilizou-se a base de dados do [Github] (https://github.com/dssg-pt/covid19pt-data)
+
+
+
+## **Sintomas**
+
+### Frequência relativa
+
+
+```{r}
+sintomas <- as.data.frame(t(covid.pt[173, 41:46]))
+
+sintomas <- sintomas %>%
+  rownames_to_column(var="Sintomas")
+names(sintomas)[2] <- "Frequência"
+
+ggplot(sintomas, aes(x=Sintomas, y=Frequência*100)) + 
+  geom_col(fill="darksalmon", width = 0.6) +
+  scale_x_discrete(labels= c("Cefaleia", "Dificuldade\nrespiratória", "Dores\nmusculares", "Febre", "Fraqueza\ngeneralizada", "Tosse")) +
+  theme_classic() +
+  labs(y="Frequência (%)",x="") +
+  theme(axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  geom_text(aes(label = scales::percent(Frequência, digits=4)), vjust=-0.5)
+
+```
+
+  Os valores apresentadas neste gráfico de barras referem-se à percentagem de casos infetados que reportaram cada um dos sintomas. É de notar que a amostra não tem a dimensão desejada uma vez que só foram registados estes dados durante 167 dias. Assim, é facilmente perceptível que a tosse é o sinal clínico mais frequente, seguido da febre.
+
+
+### Frequência relativa ao longo do tempo
+
+```{r, warning=FALSE}
+sintomas_tempo <- as.data.frame((covid.pt[8:173,41:46]*covid.pt$confirmados[8:173])-(covid.pt[7:172,41:46]*covid.pt$confirmados[7:172]))/covid.pt$confirmados_novos[8:173]
+
+sintomas_tempo_2 <- rbind(covid.pt[7,41:46], sintomas_tempo)
+
+sintomas_tempo_3 <- cbind(covid.pt$data[7:173], sintomas_tempo_2)
+names(sintomas_tempo_3) <- c("Data", "Tosse", "Febre", "Dificuldade respiratória", "Cefaleia", "Dores musculares", "Fraqueza generalizada")
+
+sintomas_tempo_3[3,4] <- 0.11
+
+sintomas_tempo_melt <- melt(sintomas_tempo_3, id.vars="Data")
+names(sintomas_tempo_melt)[-1] <- c("Sintomas", "Valores")
+
+ggplot(sintomas_tempo_melt, aes(x = Data, y = Valores*100, color = Sintomas)) +
+  geom_line() +
+  facet_grid(sintomas_tempo_melt$Sintomas) + ## para separar em varios graficos
+  guides(color = FALSE) +
+  labs(size = 20) +
+  xlab("Mês") +
+  ylab("Frequência (%)")+
+  theme(axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 20), size = 13)) +
+  theme(axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 13)) + 
+  theme(strip.text.y = element_text(color = "black", size = 8, angle = 0))
+```
+  
+  Neste gráfico de linhas vemos as frequências dos sinais clínicos dos novos casos de cada dia, ou seja, não cumulativos. Os valores negativos significam que houve uma diminuição na percentagem de pessoas com determinado sinal clinico. ?Os valores positivos, mas menores do que o do dia anterior, significam que houve crescimento menor do que do dia anterior?
+
+
+## *Casos*
+
+### Incidência
+
+### Taxa de incidência
+
+### Nº de casos por faixa etário e por género
+
+```{r}
+femininos <- as.data.frame(covid.pt %>% 
+                             dplyr::select(starts_with("confirmados_") & (ends_with("9_f")| ends_with("plus_f"))))
+
+masculinos <- as.data.frame(covid.pt %>% 
+                              dplyr::select((starts_with("confirmados_") & (ends_with("9_m")| ends_with("plus_m")))))
+
+casos_femininos <- as.data.frame(lapply(femininos, last))
+casos_masculinos <- as.data.frame(lapply(masculinos, last))
+casos_total <- as.data.frame(casos_femininos + casos_masculinos)
+
+casos_femininos_invertido <- as.data.frame(t(casos_femininos))
+casos_femininos_invertido <- casos_femininos_invertido %>% 
+  rownames_to_column(var = "Idade")
+names(casos_femininos_invertido)[2] <- "Feminino"
+casos_femininos_invertido[,1] <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+
+casos_masculinos_invertido <- as.data.frame(t(casos_masculinos))
+casos_masculinos_invertido <- casos_masculinos_invertido %>% 
+  rownames_to_column(var = "Idade")
+names(casos_masculinos_invertido)[2] <- "Masculino"
+casos_masculinos_invertido[,1] <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+
+casos_total_invertido <- as.data.frame(t(casos_total))
+casos_total_invertido <- casos_total_invertido %>% 
+  rownames_to_column(var = "Idade")
+names(casos_total_invertido)[2] <- "Total"
+casos_total_invertido[,1] <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+
+casos_fem_masc <- merge(casos_femininos_invertido, casos_masculinos_invertido, by = "Idade")
+casos_fem_masc_tot <- merge(casos_fem_masc, casos_total_invertido, by = "Idade")
+
+casos_grupo_etario_genero_melted <- reshape2::melt(casos_fem_masc_tot, id.vars = "Idade")
+names(casos_grupo_etario_genero_melted)[2:3] <- c("Género","Nº_casos")
+
+grafico_casos_idade_sexo <- ggplot(casos_grupo_etario_genero_melted, aes(x=Idade, y=Nº_casos, fill=Género)) + 
+                            geom_col(width = 0.9, position = "dodge") +
+                            theme_classic() +
+                            labs(y="Nº de casos", x="") +
+                            theme(plot.title = element_text(size = 17, hjust = 0.5)) +
+                            theme(axis.title.x = element_text(size = 1, margin = margin(t=10, r=1, b= 2, l=1)), axis.title.y = element_text(size = 15)) +
+                            scale_fill_manual(values = c("pink2", "steelblue3", "grey71")) +
+                            scale_y_continuous(expand = c(0,0)) +
+                            coord_cartesian(ylim = c(0, max(casos_grupo_etario_genero_melted$Nº_casos)+500))
+
+ggplotly(grafico_casos_idade_sexo)
+
+```
+
+  Neste gráfico podemos ver que a maior parte dos casos existentes são das faixas etárias dos 20 aos 59 anos. Este valor parece fazer sentido uma vez que corresponde à população ativa, geralmente a população mais exposta. No entanto, é importante realçar que neste gráfico não se teve em consideração a porporção da população de cada faixa etária, o que significa que pode haver mais casos nestas faixas etárias por serem simultaneamnete as faixas etárias com maior número de pessoas em Portugal. Por outro lado é visível que, ao longo de todas as faixas etárias, o género feminino é o que tem maior número de casos. Novamente, este dado por não ser estatisticamente viável pode não se ter tido em conta a porporção de pessoas do sexo feminino existentes na população.
+
+  
+### Nº de casos por ARS
+
+```{r}
+regioes_casos <- as.data.frame(t(as.data.frame(lapply(covid.pt[,4:10], last))))
+
+regioes_casos <- regioes_casos %>% 
+  rownames_to_column(var="Regiões")
+names(regioes_casos)[2] <- "Nº_casos"
+
+ggplot(regioes_casos, aes(x=Regiões, y=Nº_casos)) + 
+  geom_col(fill="plum3", width = 0.5) +
+  scale_x_discrete(labels= c("Açores", "Alentejo", "Algarve", "Centro", "Lisboa e Vale do Tejo", "Norte", "Madeira")) +
+  theme_classic() +
+  labs(y="Nº de casos", x="") +
+  theme(plot.title = element_text(size = 20, hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  geom_text(aes(label=Nº_casos), vjust=-0.5)
+
+
+regioes_casos_ordem <- regioes_casos[c(4,5,6,2,7,1,3),] # colocar as regioes pela ordem do mapa
+regioes_casos_ordem[,1] <- c("Alentejo", "Algarve", "Açores", "Centro", "Madeira", "Norte", "Lisboa e Vale do Tejo" )
+
+pal_casos <- colorBin("Blues",  bins = c(0,300, 2000, 6000, 20000, 30000, Inf)) ## tonalidade das cores consoante os casos
+
+labels_casos <- paste( #tornar o mapa interativo
+  "<strong>", regioes_casos_ordem[,1],"</strong><br/>", 
+  regioes_casos_ordem[,2], " casos<br/>", 
+  sep="") %>%
+  lapply(htmltools::HTML)
+
+leaflet(mapa_portugal) %>%
+  addPolygons(stroke = TRUE, smoothFactor = 0.3, fillOpacity = 1, color = "black", weight = 1,
+              fillColor = ~pal_casos(regioes_casos_ordem$Nº_casos),
+              label = labels_casos, 
+              labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")) %>% 
+  addLegend("bottomleft", pal = pal_casos, values = regioes_casos_ordem$Nº_casos, opacity = 0.5, title = "Nº de casos por ARS") %>%
+  addTiles(group ="Original") %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satélite") %>%
+  addLayersControl(baseGroups = c("Original", "Positron", "Satélite"), options = layersControlOptions(collapsed = FALSE))
+
+```
+
+Neste gráfico e mapa podemos ver que Lisboa e Vale do Tejo é a ARS com mais casos, seguindo-se a ARS Norte. Com menos casos, é de realçar as ARS's dos Açores e da Madeira que com as estratégias implementadas para os turistas da obrigatoriedade da realização de um teste ao SARS-CoV-2 negativo até 72h antes da ida ou a realização do teste à chegada ao aeroporto, cumprindo o isolamento profilático até à recepção do resultado do mesmo, mostraram ser bem sucedidas.
+  
+  
+# Incidência/Taxa de incidência
+
+## Incidência diária por grupo etário
+
+```{r, warning=FALSE}
+femininos_casos_tempo <- femininos-lag(femininos)
+masculinos_casos_tempo <- masculinos-lag(masculinos)
+total_casos_tempo <- cbind(covid.pt$data, femininos_casos_tempo + masculinos_casos_tempo)
+total_casos_tempo[7,2:10] <- femininos[7,] + masculinos[7,]
+names(total_casos_tempo) <- c("Data", "0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+
+total_casos_tempo_melted <- reshape2::melt(total_casos_tempo, id.vars="Data")
+names(total_casos_tempo_melted)[2:3] <- c("Idade", "Nº_casos")
+
+grafico_casos_idade_tempo <- ggplot(total_casos_tempo_melted, aes(x=Data, y=Nº_casos, fill=Idade)) +
+                            geom_area() +
+                            guides(color=FALSE) + ##tirar a legenda 
+                            scale_x_date(date_breaks = "months", date_labels = "%b")
+
+ggplotly(grafico_casos_idade_tempo)
+
+```
+
+
+  Neste gráfico de área podemos ver que em Abril houve o valor máximo de novos cassos diários, ultrapassando num dia os 1500 novos casos. De seguida, os casos foram diminuindo, voltando a aumentar nos meses de Junho e Julho. Depois, voltaram a descrescer em Agosto e começaram a aumentar de novo a partir de Setembro. Com este gráfico podemos também verificar que a faixa etária dos 70-79 anos foi a que se manteve mais consistente no número de novos casos e que as faixas etárias com maior expressão de casos diários são dos 20 aos 49 anos.
+  
+  
+  
+## Taxa de incidência diária por género
+
+```{r, warning=FALSE}
+pop_total <- 10295909
+pop_homens <- 4859977
+pop_mulheres <- 5435932
+
+incidencia_total <- as.data.frame(covid.pt$confirmados_novos/(pop_total - covid.pt$confirmados - covid.pt$obitos))
+
+incidencia_homens <- as.data.frame((covid.pt$confirmados_m - lag(covid.pt$confirmados_m))/(pop_homens - covid.pt$confirmados_m - covid.pt$obitos_m))
+incidencia_homens[174:175,] <- NA
+
+incidencia_mulheres <- as.data.frame((covid.pt$confirmados_f - lag(covid.pt$confirmados_f))/(pop_mulheres - covid.pt$confirmados_f - covid.pt$obitos_f))
+incidencia_mulheres[174:175,] <- NA
+
+incidencia_nt <- cbind(covid.pt$data, incidencia_total, incidencia_homens, incidencia_mulheres)
+names(incidencia_nt) <- c("Data", "Total", "Homens", "Mulheres")
+
+incidencia_melt <- reshape2::melt(incidencia_nt, id.vars="Data")
+names(incidencia_melt)[-1] <- c("Género", "Valores")
+
+ggplot(incidencia_melt, aes(x=Data, y=Valores*100, color=Género)) +
+  geom_line() +
+  facet_grid(incidencia_melt$Género)+
+  guides(color = FALSE) +
+  xlab("Mês") +
+  ylab("Incidência (%)") +
+  theme(plot.title = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 20, color = "black", hjust = 0.5)) +
+  theme(axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 20), size = 15)) +
+  theme(axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 15)) +
+  scale_x_date(date_breaks = "months", date_labels = "%b")
+```
+
+  Neste gráfico de linhas podemos ver que a taxa de incidência mais alta ocorreu em Abril, tendo diminuido de seguida, ficando constante até ao fim do Verão. A partir de Setembro o número de novos casos por população em risco voltou a subir. Neste gráfico é visível também que não existe grande alteração entre os géneros. 
+
+
+## Taxa de incidência por ARS ao longo do tempo
+
+```{r warning=FALSE}
+pop_acores <- 242796
+pop_alentejo <- 705018
+pop_algarve <- 438635
+pop_centro <- 2216927 
+pop_lvt <- 2854802
+pop_norte <- 3573961
+pop_madeira <- 254254
+
+pop_regioes <- as.data.frame(c(pop_norte, pop_centro, pop_lvt, pop_alentejo, pop_algarve, pop_acores,pop_madeira))
+pop_regioes_rep <- as.data.frame(t(pop_regioes[rep(seq_len(ncol(pop_regioes)), each=nrow(covid.pt))]))
+names(pop_regioes_rep) <- c("Norte", "Centro", "LVT", "Alentejo", "Algarve", "Açores", "Madeira")
+
+incidencia_regioes_sd <- as.data.frame((covid.pt[,confirmados_arsnorte:confirmados_madeira]- lag(covid.pt[, confirmados_arsnorte:confirmados_madeira]))) / (pop_regioes_rep - as.data.frame(covid.pt[, confirmados_arsnorte:confirmados_madeira] - covid.pt[, obitos_arsnorte:obitos_madeira]))
+
+incidencia_regioes <- cbind(covid.pt$data, incidencia_regioes_sd)
+names(incidencia_regioes) <- c("Data", "Norte", "Centro", "LVT", "Alentejo", "Algarve", "Açores", "Madeira")
+
+incidencia_regioes_melted <- reshape2::melt(incidencia_regioes, id.vars="Data")
+names(incidencia_regioes_melted)[-1] <- c("ARS", "Incidência")
+
+ggplot(incidencia_regioes_melted, aes(x= Data, y = Incidência*100, color = ARS)) +
+  geom_line() +
+  xlab("Mês") +
+  ylab("Incidência (%)") +
+  facet_grid(incidencia_regioes_melted$ARS) +
+  guides(color = FALSE) +
+  theme(plot.title = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 20, color = "black", hjust = 0.5)) +
+  theme(axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 20), size = 15)) +
+  theme(axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 15)) +
+  scale_x_date(date_breaks = "months", date_labels = "%b")
+
+```
+
+  Com este gráfico de linhas conseguimos ver as diferentes taxas de incidência para cada ARS. As ARS's dos Açores e da Madeira são as que têm as taxas de incidência mais baixas e mais constantes. As ARS's do Algarve e do Alentejo têm um comportamento muito semelhante. Tiveram um aumento em Abril, como todas as outras ARS's, mas baixaram este número e conseguiram mantê-lo constante até ao iníco do Verão. Como podemos ver, nestas duas ARS's muito procuradas como destino de férias, as taxas de incidência aumentaram logo a partir de Junho. A ARS do Centro é, das ARS's de Portugal continental, a única que se tem mantido constante deste setembro, sem grandes subidas. A ARS do Norte foi a que teve uma maior taxa de incidência em Abril, mas consegui estabilizar a partir de Maio. Desde Setembro voltou a subir de forma considerável. A ARS de Lisboa e Vale do Tejo é a que tem o comportamento mais díspar e preocupante. Sem nunca ter diminuído de forma tão acentuada como as outras ARS's, manteve-se mais ou menos constante ao longo do Verão. No entanto, a taxa de incidência começou a subir a partir de Setembro, apresentando o maior valor desde o início da pandemia.
+
+
+
+# Número de mortes
+
+##  Nº de mortes por género
+
+```{r, warning=FALSE}
+mortes_total <- last(covid.pt$obitos)
+mortes_mulheres <- last(covid.pt$obitos_f)
+mortes_homens <- last(covid.pt$obitos_m)
+
+numero_mortes_nt <-cbind(mortes_total, mortes_homens, mortes_mulheres)
+
+numero_mortes <- as.data.frame(t(numero_mortes_nt))
+numero_mortes <- numero_mortes %>% 
+  rownames_to_column(var="Género")
+names(numero_mortes)[2] <- "Nº_mortes"
+
+ggplot(numero_mortes, aes(x=Género, y=Nº_mortes)) + 
+  geom_col(fill="steelblue4", width = 0.5) +
+  scale_x_discrete(labels= c("Homens", "Mulheres", "Total")) +
+  theme_classic() +
+  labs(y="Nº de mortes", x="") +
+  theme(plot.title = element_text(size = 20, hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  geom_text(aes(label = Nº_mortes), vjust=-0.5)
+```
+
+  Neste gráfico de barras constata-se que não há grande diferença entre o número de mortes dos homens e das mulheres.
+  
+
+## Nº de mortes por grupo etário e por género
+
+```{r, warning=FALSE}
+
+femininos_mortes <- as.data.frame(covid.pt %>% 
+                                    dplyr::select(starts_with("obitos_") & (ends_with("9_f")| ends_with("plus_f"))))
+
+masculinos_mortes <- as.data.frame(covid.pt %>% 
+                                     dplyr::select((starts_with("obitos_") & (ends_with("9_m")| ends_with("plus_m")))))
+
+
+mortes_grupo_etario_f <- as.data.frame(t(as.data.frame(lapply(femininos_mortes, last))))
+mortes_grupo_etario_m <- as.data.frame(t(as.data.frame(lapply(masculinos_mortes, last))))
+
+mortes_grupo_etario_total <- as.data.frame(mortes_grupo_etario_f + mortes_grupo_etario_m)
+
+mortes_grupo_etario_f <- mortes_grupo_etario_f %>%
+  rownames_to_column(var="Idade")
+  names(mortes_grupo_etario_f)[2] <- "Feminino"
+  mortes_grupo_etario_f[,1] <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+  
+mortes_grupo_etario_m <- mortes_grupo_etario_m %>%
+  rownames_to_column(var="Idade")
+  names(mortes_grupo_etario_m)[2] <- "Masculino"
+  mortes_grupo_etario_m[,1] <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+  
+mortes_grupo_etario_total <- mortes_grupo_etario_total %>%
+  rownames_to_column(var="Idade")
+  names(mortes_grupo_etario_total)[2] <- "Total"
+  mortes_grupo_etario_total[,1] <- c("0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80+")
+  
+mortes_grupo_etario_fm <- merge(mortes_grupo_etario_f, mortes_grupo_etario_m, by = "Idade")
+mortes_grupo_etario_merged <- merge(mortes_grupo_etario_fm, mortes_grupo_etario_total, by = "Idade" )
+  
+mortes_grupo_etario_melted <- reshape2::melt(mortes_grupo_etario_merged, id.vars = "Idade")
+  names(mortes_grupo_etario_melted)[2:3] <- c("Género","Mortes")
+  
+  
+grafico_mortes_idades_genero <- ggplot(mortes_grupo_etario_melted, aes(x=Idade, y=Mortes, fill=Género)) +
+                                geom_col(width = 0.9, position = "dodge") +
+                                theme_classic() +
+                                labs(y="Nº de mortes", x="") +
+                                theme(plot.title = element_text(size = 20, hjust = 0.5)) +
+                                theme(axis.title.x = element_text(size = 1), axis.title.y = element_text(size = 15)) +
+                                scale_fill_manual(values = c("pink2", "steelblue3", "grey71"))
+
+  ggplotly(grafico_mortes_idades_genero)
+```
+
+  Neste gráfico de barras é facilmente visível que até aos 39 anos o número de mortes é quase inexistente. Começa a aumentar de forma mais significativa a partir dos 59 anos (população de risco), sendo a faixa etária dos 80+ anos aquela que tem, de longe, o maior número de mortes. É perceptível também que o género masculino tem maior número de mortes, ao longo de todas as faixas etárias execto na faixa etária dos 80+. Para estes dados serem estatisticamente viáveis,  era necessário ter-se tido em conta a porporção de pessoas dos géneros masculino e feminino existentes em cada faixa etária da população.
+  
+  
+## Nº de mortes por ARS
+
+```{r, warning=FALSE}
+regioes_mortes <- as.data.frame(t(as.data.frame(lapply(covid.pt[,obitos_arsnorte:obitos_madeira], last))))
+
+regioes_mortes <- regioes_mortes %>% 
+  rownames_to_column(var="Regiões")
+names(regioes_mortes)[2] <- "Nº_mortes"
+
+ggplot(regioes_mortes, aes(x=Regiões, y=Nº_mortes)) + 
+  geom_col(fill="olivedrab4", width = 0.5) +
+  scale_x_discrete(labels= c("Açores", "Alentejo", "Algarve", "Centro", "Lisboa e Vale do Tejo", "Norte", "Madeira")) +
+  theme_classic() +
+  labs(y="Nº de mortes", x="") +
+  theme(plot.title = element_text(size = 20, hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  geom_text(aes(label=Nº_mortes), vjust=-0.5)
+
+
+
+regioes_mortes_ordem <- regioes_mortes[c(4,5,6,2,7,1,3),] # colocar as regioes pela ordem do mapa
+regioes_mortes_ordem[,1] <- c("Alentejo", "Algarve", "Açores", "Centro", "Madeira", "Norte", "Lisboa e Vale do Tejo" )
+
+pal_mortes <- colorBin("YlOrBr", domain = regioes_mortes_ordem$Nº_mortes, pretty = TRUE) 
+
+labels_mortes <- paste( 
+  "<strong>", regioes_mortes_ordem[,1],"</strong><br/>", 
+  regioes_mortes_ordem[,2], " mortes<br/>", 
+  sep="") %>%
+  lapply(htmltools::HTML)
+
+leaflet(mapa_portugal) %>%
+  addPolygons(stroke = TRUE, smoothFactor = 0.3, fillOpacity = 1, color = "black", weight = 1,
+              fillColor = ~pal_mortes(regioes_mortes_ordem$Nº_mortes),
+              label = labels_mortes, 
+              labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")) %>% 
+  addLegend("bottomleft", pal = pal_mortes, values = regioes_mortes_ordem$Nº_mortes, opacity = 0.5, title = "Nº de mortes por região") %>% 
+  addTiles(group ="Original") %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satélite") %>%
+  addProviderTiles(providers$CartoDB.DarkMatter, group = "CartoDB.DarkMatter") %>%
+  addLayersControl(baseGroups = c("Original", "Positron", "Satélite", "Dark"), options = layersControlOptions(collapsed = FALSE))
+
+```
+
+  Neste gráfico de barras vemos que a ARS com maior número de mortes é a Norte, seguida de Lisboa e Vale do Tejo. É importante realçar que este número é absoluto logo não tem em consideração a porporção de infetados de cada ARS.
+
+
+
+
+# Taxa de mortalidade 
+
+## Taxa de mortalidade por género
+
+```{r, warning=FALSE}
+tm_total <- last(covid.pt$obitos)/pop_total
+tm_homens <- last(covid.pt$obitos_m)/ pop_homens
+tm_mulheres <- last(covid.pt$obitos_f)/ pop_mulheres
+
+tm_nt <- cbind(tm_total, tm_homens, tm_mulheres)
+
+tm <- as.data.frame(t(tm_nt))
+tm <- tm %>% 
+  rownames_to_column(var="Género")
+names(tm)[2] <- "Taxa_Mortalidade"
+
+ggplot(tm, aes(x=Género, y=Taxa_Mortalidade*100)) + 
+  geom_col(fill="snow3", width = 0.5) +
+  scale_x_discrete(labels= c("Homens", "Mulheres", "Total")) +
+  theme_classic() +
+  labs(y="Taxa de mortalidade (%)", x="") +
+  theme(plot.title = element_text(size = 20, hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  geom_text(aes(label = scales::percent(Taxa_Mortalidade, digits=4)), vjust=-0.5)
+
+```
+
+  Neste gráfico de barras podemos ver que os homens têm uma taxa de mortalidade superior à das mulheres. Contudo, este gráfico não tem em conta a se existem mais pessoas do género masculino infetadas do que do género feminino.
+  
+  
+## Taxa de mortalidade por ARS
+
+```{r, warning=FALSE}
+tm_acores <- last(covid.pt$obitos_acores)/pop_acores
+tm_alentejo <- last(covid.pt$obitos_arsalentejo)/pop_alentejo
+tm_algarve <- last(covid.pt$obitos_arsalgarve)/pop_algarve
+tm_centro <- last(covid.pt$obitos_arscentro)/pop_centro
+tm_lvt <- last(covid.pt$obitos_arslvt)/pop_lvt
+tm_norte <- last(covid.pt$obitos_arsnorte)/pop_norte
+tm_madeira <- last(covid.pt$obitos_madeira)/pop_madeira
+
+regioes_tm_nt <- cbind(tm_acores, tm_alentejo, tm_algarve, tm_centro, tm_lvt, tm_norte, tm_madeira)
+
+regioes_tm <- as.data.frame(t(regioes_tm_nt))
+regioes_tm <- regioes_tm %>% 
+  rownames_to_column(var="Região")
+names(regioes_tm)[2] <- "Taxa_Mortalidade"
+
+ggplot(regioes_tm, aes(x=Região, y=Taxa_Mortalidade*100)) + 
+  geom_col(fill="indianred4", width = 0.5) +
+  scale_x_discrete(labels= c("Açores", "Alentejo", "Algarve", "Centro", "Lisboa e Vale do Tejo", "Madeira", "Norte")) +
+  theme_classic() +
+  labs(y="Taxa de mortalidade (%)", x="") +
+  theme(plot.title = element_text(size = 20, hjust = 0.5)) +
+  theme(axis.title.x = element_text(size = 15), axis.title.y = element_text(size = 15)) +
+  geom_text(aes(label = scales::percent(round(Taxa_Mortalidade, digits=5))), vjust=-0.5)
+
+
+
+regioes_tm_ordem <- regioes_tm[c(2,3,1,4,7,6,5),] # colocar as regioes pela ordem do mapa
+regioes_tm_ordem[,1] <- c("Alentejo", "Algarve", "Açores", "Centro", "Madeira", "Norte", "Lisboa e Vale do Tejo" )
+
+pal_tm <- colorBin("BuPu", domain = regioes_tm_ordem$Taxa_Mortalidade*100, bins = c(0, 0.003, 0.005, 0.007, 0.01, 0.02, Inf)) 
+
+labels_tm <- paste( 
+  "<strong>", regioes_tm_ordem[,1],"</strong><br/>", 
+  round(regioes_tm_ordem[,2]*100, digits = 4), "&#37<br/>", 
+  sep="") %>%
+  lapply(htmltools::HTML)
+
+leaflet(mapa_portugal) %>%
+  addPolygons(stroke = TRUE, smoothFactor = 0.3, fillOpacity = 1, color = "black", weight = 1,
+              fillColor = ~pal_tm(regioes_tm_ordem$Taxa_Mortalidade*100),
+              label = labels_tm, 
+              labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")) %>% 
+  addLegend("bottomleft", pal = pal_tm, values = regioes_tm_ordem$Taxa_Mortalidade, opacity = 0.5, title = "Taxa de mortalidade por região (%)") %>% 
+  addProviderTiles(providers$CartoDB.Positron, group = "Positron") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satélite") %>%
+  addProviderTiles(providers$CartoDB.DarkMatter, group = "CartoDB.DarkMatter") %>%
+  addLayersControl(baseGroups = c("Positron", "Satélite", "Dark"), options = layersControlOptions(collapsed = FALSE))
+
+
+```
+
+
+  Neste gráfico de barras é possível ver que a ARS Lisboa e Vale do Tejo é a que tem a maior taxa de mortalidade seguida da ARS Norte. Por outro lado, a ARS ds Madeira ainda não apresenta qualquer caso de morte por COVID-19. 

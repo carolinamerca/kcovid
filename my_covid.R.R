@@ -127,10 +127,10 @@ grafico_testes_diarios <- ggplot(testes_diarios, aes(x = Data, y = Testes)) +
 ggplotly(grafico_testes_diarios)
 
 
-## Evoluçao do numero de testes realizados (diarios) - média rolante
+## Evoluçao do numero de testes realizados (diarios) - média rolante 7 dias
 
-testes_diarios_mr <- cbind(covid.pt_testes[,1], zoo::rollmean(covid.pt_testes[,3], k = 7, fill = NA))
-names(testes_diarios_mr) = c("Data", "Testes")
+testes_diarios_mr <- cbind(covid.pt_testes[7:nrow(covid.pt_testes),1], zoo::rollmean(covid.pt_testes[,3], k = 7))
+  names(testes_diarios_mr) = c("Data", "Testes")
 
 grafico_testes_diarios_mr <- ggplot(testes_diarios_mr, aes(x = Data, y = Testes)) +
   geom_line(size = 0.4, color = "orchid3") +
@@ -275,23 +275,43 @@ grafico_incidencia_regioes <- ggplot(incidencia_regioes_melted, aes(x= Data, y =
 ggplotly(grafico_incidencia_regioes)
 
 
-## Evolução da incidencia por ARS - Média rolante
+## Evolução da incidencia por ARS - Média rolante 7 dias
 
-medias_rolantes_incidencia_regiao <- cbind(incidencia_regioes_melted[,1:2], as.data.frame(zoo::rollmean(incidencia_regioes_melted[,3], k = 7, fill = NA)))
-names(medias_rolantes_incidencia_regiao) = c("Data", "ARS", "Incidência")
+medias_rolantes_7_incidencia_regiao <- cbind(incidencia_regioes_melted[7:nrow(incidencia_regioes_melted),1:2], as.data.frame(zoo::rollmean(incidencia_regioes_melted[,3], k = 7)))
+names(medias_rolantes_7_incidencia_regiao) = c("Data", "ARS", "Incidência")
 
-grafico_incidencia_tempo_mr <- ggplot(medias_rolantes_incidencia_regiao, aes(x = Data, y = Incidência, color = ARS)) +
+grafico_incidencia_tempo_mr_7 <- ggplot(medias_rolantes_7_incidencia_regiao, aes(x = Data, y = Incidência, color = ARS)) +
   geom_line()+
   xlab("Mês") +
   ylab("Incidência")+
-  labs(title = "Evolução da Incidência por ARS - Média rolante") +
+  labs(title = "Evolução da Incidência por ARS - Média rolante 7 dias") +
   theme(plot.title = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 15, color = "black", hjust = 0.5)) +
   theme(axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 20), size = 13)) +
   theme(axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 13)) +
   theme(legend.title = element_blank()) + 
   scale_x_date(date_breaks = "months", date_labels = "%b")
 
-ggplotly(grafico_incidencia_tempo_mr) %>% 
+ggplotly(grafico_incidencia_tempo_mr_7) %>% 
+  layout(legend=list(x=1, y=0))
+
+
+## Evolução da incidencia por ARS - Média rolante 14 dias
+
+medias_rolantes_14_incidencia_regiao <- cbind(incidencia_regioes_melted[14:nrow(incidencia_regioes_melted),1:2], as.data.frame(zoo::rollmean(incidencia_regioes_melted[,3], k = 14)))
+names(medias_rolantes_14_incidencia_regiao) = c("Data", "ARS", "Incidência")
+
+grafico_incidencia_tempo_mr_14 <- ggplot(medias_rolantes_14_incidencia_regiao, aes(x = Data, y = Incidência, color = ARS)) +
+  geom_line()+
+  xlab("Mês") +
+  ylab("Incidência")+
+  labs(title = "Evolução da Incidência por ARS - Média rolante 14 dias") +
+  theme(plot.title = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 15, color = "black", hjust = 0.5)) +
+  theme(axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 20), size = 13)) +
+  theme(axis.title.x = element_text(margin = margin(t = 20, r = 0, b = 20, l = 0), size = 13)) +
+  theme(legend.title = element_blank()) + 
+  scale_x_date(date_breaks = "months", date_labels = "%b")
+
+ggplotly(grafico_incidencia_tempo_mr_14) %>% 
   layout(legend=list(x=1, y=0))
 
 
@@ -440,9 +460,9 @@ grafico_casos_idade_tempo <- ggplot(total_casos_tempo_melted, aes(x=Data, y=Nº_
 ggplotly(grafico_casos_idade_tempo)
 
 
-## Evolução da Incidência por faixa etária - grafico de linhas com média rolante
+## Evolução da Incidência por faixa etária - grafico de linhas com média rolante 7 dias
 
-medias_rolantes_incidencia_idade_tempo <- cbind(total_casos_tempo_melted[,1:2], as.data.frame(zoo::rollmean(total_casos_tempo_melted[,3], k = 7, fill = NA)))
+medias_rolantes_incidencia_idade_tempo <- cbind(total_casos_tempo_melted[7:nrow(total_casos_tempo_melted),1:2], as.data.frame(zoo::rollmean(total_casos_tempo_melted[,3], k = 7)))
   names(medias_rolantes_incidencia_idade_tempo) = c("Data", "Idade", "Incidência")
 
 grafico_incidencia_idade_tempo_mr <- ggplot(medias_rolantes_incidencia_idade_tempo, aes(x=Data, y=Incidência, color=Idade)) +
