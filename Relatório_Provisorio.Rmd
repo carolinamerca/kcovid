@@ -3,15 +3,15 @@ title: "Análise COVID-19"
 author: "Estagiárias"
 date: "30/09/2020"
 output:
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
   html_document:
     code_folding: hide
     df_print: paged
     theme: lumen
     toc: yes
     toc_depth: 3
-  pdf_document:
-    toc: yes
-    toc_depth: '3'
   html_notebook:
     code_folding: hide
     theme: lumen

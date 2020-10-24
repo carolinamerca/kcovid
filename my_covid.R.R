@@ -47,6 +47,12 @@ covid.pt_testes <- fread("https://raw.githubusercontent.com/dssg-pt/covid19pt-da
 mapa_portugal <- geojson_read("https://raw.githubusercontent.com/dssg-pt/covid19pt-data/master/extra/mapas/portugal.geojson", what = "sp")
 
 
+# TRATAR A BASE DE DADOS DO COVID
+
+## Houve um lapso na base de dados e os obitos por idade e por sexo para dia 5/10 (linha 223) estao a 0's. Subituimos esses 0's
+## por os mesmos valores do dia anterior
+
+covid.pt[223, 65:84] = covid.pt[222, 65:84]
 
 #POR AS DATAS EM FORMATO DATA
 
