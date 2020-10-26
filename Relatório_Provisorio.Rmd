@@ -3,15 +3,15 @@ title: "Análise COVID-19"
 author: "Estagiárias"
 date: "30/09/2020"
 output:
-  pdf_document:
-    toc: yes
-    toc_depth: '3'
   html_document:
     code_folding: hide
     df_print: paged
     theme: lumen
     toc: yes
     toc_depth: 3
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
   html_notebook:
     code_folding: hide
     theme: lumen
@@ -51,7 +51,8 @@ Este relatório tem como objetivo realizar uma análise detalhada dos seguintes 
   <li>Recuperação</li>
 </ul>
 
-
+Nota:  Houve um lapso na base de dados e os óbitos acumulados por idade e por sexo para dia 5/10 estão a 0's. Subituímos esses 0's
+pelos mesmos valores do dia anterior.
 ```{r warning=FALSE, message=FALSE}
 #Libraries
 library(data.table)
@@ -81,6 +82,12 @@ covid19pt_testes <- fread("https://raw.githubusercontent.com/dssg-pt/covid19pt-d
 #Data de chr para Date
 covid19pt$data <- as.Date(covid19pt$data,"%d-%m-%Y")
 covid19pt_testes$data <- as.Date(covid19pt_testes$data,"%d-%m-%Y")
+
+#Tratar base de dados do covid
+
+## Houve um lapso na base de dados e os obitos acumulados por idade e por sexo para dia 5/10 (linha 223) estao a 0's. Subituimos esses 0's
+## pelos mesmos valores do dia anterior
+covid19pt[223, 65:84] = covid19pt[222, 65:84]
 
 #Mapa de Portugal
 mapa_pt <- geojson_read("https://raw.githubusercontent.com/dssg-pt/covid19pt-data/master/extra/mapas/portugal.geojson",what = "sp")

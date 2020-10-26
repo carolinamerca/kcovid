@@ -49,7 +49,7 @@ mapa_portugal <- geojson_read("https://raw.githubusercontent.com/dssg-pt/covid19
 
 # TRATAR A BASE DE DADOS DO COVID
 
-## Houve um lapso na base de dados e os obitos por idade e por sexo para dia 5/10 (linha 223) estao a 0's. Subituimos esses 0's
+## Houve um lapso na base de dados e os obitos acumulados por idade e por sexo para dia 5/10 (linha 223) estao a 0's. Subituimos esses 0's
 ## pelos mesmos valores do dia anterior
 
 covid.pt[223, 65:84] = covid.pt[222, 65:84]
